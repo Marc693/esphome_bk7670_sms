@@ -1,0 +1,9 @@
+{
+  "domain": "bk7670_sms",
+  "name": "BK7670 SMS Modem",
+  "version": "1.0.0",
+  "documentation": "https://github.com/Marc693/esphome_bk7670_sms",
+  "requirements": [],
+  "dependencies": ["esphome"],
+  "codeowners": ["@Marc693"]
+}
