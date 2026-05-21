@@ -3,14 +3,19 @@ import esphome.config_validation as cv
 from esphome.components import uart, output
 from esphome.const import CONF_ID
 
+# Namespace du composant
 bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
-BK7670SMSComponent = bk7670_ns.class_("BK7670SMS", uart.UARTDevice)
 
+# Déclaration de la classe C++ (doit correspondre EXACTEMENT au .h)
+BK7670SMS = bk7670_ns.class_("BK7670SMS", uart.UARTDevice)
+
+# Champs YAML
 CONF_GPIO_AD = "gpio_ad"
 CONF_GPIO_HE = "gpio_he"
 CONF_GPIO_HG = "gpio_hg"
 CONF_GPIO_POWERKEY = "gpio_powerkey"
 
+# Schéma de configuration
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BK7670SMS),
 
