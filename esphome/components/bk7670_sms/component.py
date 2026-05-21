@@ -3,14 +3,12 @@ from esphome.components import uart, switch
 from esphome.const import CONF_ID
 
 from .schema import (
+    BK7670SMSComponent,
     CONF_GPIO_AD,
     CONF_GPIO_HE,
     CONF_GPIO_HG,
     CONF_GPIO_POWERKEY,
 )
-
-bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
-BK7670SMSComponent = bk7670_ns.class_("BK7670SMSComponent", cg.Component, uart.UARTDevice)
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
