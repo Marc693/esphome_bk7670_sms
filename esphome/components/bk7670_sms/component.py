@@ -12,7 +12,8 @@ from .schema import (
 )
 
 bk7670_sms_ns = cg.esphome_ns.namespace("bk7670_sms")
-BK7670SMSComponent = bk7670_sms_ns.class_("BK7670SMS", cg.Component, cg.UARTDevice)
+BK7670SMSComponent = bk7670_sms_ns.class_("BK7670SMSComponent", cg.Component)
+
 
 CONFIG_SCHEMA = CONFIG_SCHEMA
 
