@@ -10,6 +10,9 @@ namespace bk7670_sms {
 
 class BK7670SMS : public uart::UARTDevice, public Component {
  public:
+  // CONSTRUCTEUR OBLIGATOIRE POUR UARTDevice
+  BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
+
   void set_gpio_ad(output::BinaryOutput *out) { this->gpio_ad_ = out; }
   void set_gpio_he(output::BinaryOutput *out) { this->gpio_he_ = out; }
   void set_gpio_hg(output::BinaryOutput *out) { this->gpio_hg_ = out; }
