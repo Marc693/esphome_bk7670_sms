@@ -4,8 +4,10 @@ from esphome.const import CONF_ID, CONF_UART_ID
 from esphome.components.uart import UARTComponent
 from esphome import pins
 
-# Import obligatoire : sinon NameError
-from .component import BK7670SMSComponent
+# On ne doit PAS importer BK7670SMSComponent ici
+# On déclare seulement l'ID
+bk7670_sms_ns = cg.esphome_ns.namespace("bk7670_sms")
+BK7670SMSComponent = bk7670_sms_ns.class_("BK7670SMSComponent", cg.Component)
 
 CONF_PIN_CODE = "pin_code"
 CONF_ACL_NUMBERS = "acl_numbers"
