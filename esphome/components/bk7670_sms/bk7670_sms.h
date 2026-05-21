@@ -11,7 +11,8 @@ class BK7670SMS : public uart::UARTDevice {
  public:
   BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
 
-  void loop() override;
+  // PAS override → UARTDevice n'a pas de loop virtuelle
+  void loop();
 
   void set_gpio_ad(output::BinaryOutput *out) { this->gpio_ad_ = out; }
   void set_gpio_he(output::BinaryOutput *out) { this->gpio_he_ = out; }
