@@ -7,10 +7,11 @@ namespace bk7670_sms {
 static const char *const TAG = "bk7670_sms";
 
 void BK7670SMS::loop() {
+  ESP_LOGD("bk7670_sms", "loop running");
   while (this->available()) {
     uint8_t c;
     this->read_byte(&c);
-    // traitement si besoin
+    ESP_LOGD("bk7670_sms", "RX: %c (0x%02X)", c, c);
   }
 }
 

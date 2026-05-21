@@ -16,6 +16,7 @@ async def to_code(config):
 
     # Créer l’objet C++ AVEC le parent UART
     var = cg.new_Pvariable(config[CONF_ID], uart_parent)
+    cg.add(var.modem_reboot())
 
     # Enregistrer comme UARTDevice
     await uart.register_uart_device(var, config)
