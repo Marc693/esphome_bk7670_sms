@@ -4,7 +4,7 @@ from esphome.components import uart, output
 from esphome.const import CONF_ID
 
 bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
-BK7670SMSComponent = bk7670_ns.class_("BK7670SMSComponent", uart.UARTDevice)
+BK7670SMSComponent = bk7670_ns.class_("BK7670SMS", uart.UARTDevice)
 
 CONF_GPIO_AD = "gpio_ad"
 CONF_GPIO_HE = "gpio_he"
@@ -12,7 +12,7 @@ CONF_GPIO_HG = "gpio_hg"
 CONF_GPIO_POWERKEY = "gpio_powerkey"
 
 CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(BK7670SMSComponent),
+    cv.GenerateID(): cv.declare_id(BK7670SMS),
 
     cv.Required("uart_id"): cv.use_id(uart.UARTComponent),
     cv.Required("pin_code"): cv.string,

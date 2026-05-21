@@ -3,7 +3,7 @@ from esphome.components import uart, output
 from esphome.const import CONF_ID
 
 from .schema import (
-    BK7670SMSComponent,
+    BK7670SMS,
     CONF_GPIO_AD,
     CONF_GPIO_HE,
     CONF_GPIO_HG,
