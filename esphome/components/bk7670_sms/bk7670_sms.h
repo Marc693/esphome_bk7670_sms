@@ -3,6 +3,7 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/output/binary_output.h"
 #include "esphome/core/component.h"
+#include "esphome/core/log.h"
 #include <vector>
 
 namespace esphome {
@@ -10,7 +11,7 @@ namespace bk7670_sms {
 
 class BK7670SMS : public uart::UARTDevice, public Component {
  public:
-  // CONSTRUCTEUR OBLIGATOIRE POUR UARTDevice
+  // Constructeur conforme à UARTDevice
   BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
 
   void set_gpio_ad(output::BinaryOutput *out) { this->gpio_ad_ = out; }
@@ -22,6 +23,14 @@ class BK7670SMS : public uart::UARTDevice, public Component {
 
   void loop() override;
   void send_sms(const std::string &number, const std::string &text);
+
+  // Traitement des SMS entrants
+  void process_sms(const std::string &sender, const std::string &body);
+
+  // Commandes logiques
+  void do_arm();
+  void do_disarm();
+  void do_status(const std::string &sender);
 
  protected:
   output::BinaryOutput *gpio_ad_{nullptr};
