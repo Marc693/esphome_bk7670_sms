@@ -7,11 +7,12 @@ namespace bk7670_sms {
 static const char *const TAG = "bk7670_sms";
 
 void BK7670SMS::loop() {
-  ESP_LOGD("bk7670_sms", "loop running");
+  ESP_LOGD(TAG, "loop running");
+
   while (this->available()) {
     uint8_t c;
     this->read_byte(&c);
-    ESP_LOGD("bk7670_sms", "RX: %c (0x%02X)", c, c);
+    ESP_LOGD(TAG, "RX: %c (0x%02X)", c, c);
   }
 }
 
@@ -26,14 +27,6 @@ void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
 
   this->write_str(text.c_str());
   this->write_byte(26);  // CTRL+Z
-}
-
-void BK7670SMS::modem_reboot() {
-  if (this->gpio_powerkey_ != nullptr) {
-    this->gpio_powerkey_->turn_on();
-    delay(1500);
-    this->gpio_powerkey_->turn_off();
-  }
 }
 
 }  // namespace bk7670_sms

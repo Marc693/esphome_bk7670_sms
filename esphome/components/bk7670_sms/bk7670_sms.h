@@ -7,26 +7,19 @@
 namespace esphome {
 namespace bk7670_sms {
 
-class BK7670SMS : public uart::UARTDevice {
+class BK7670SMS : public uart::UARTDevice, public Component {
  public:
-  BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
-
-  // PAS override → UARTDevice n'a pas de loop virtuelle
-  void loop();
-
   void set_gpio_ad(output::BinaryOutput *out) { this->gpio_ad_ = out; }
   void set_gpio_he(output::BinaryOutput *out) { this->gpio_he_ = out; }
   void set_gpio_hg(output::BinaryOutput *out) { this->gpio_hg_ = out; }
-  void set_gpio_powerkey(output::BinaryOutput *out) { this->gpio_powerkey_ = out; }
 
+  void loop() override;
   void send_sms(const std::string &number, const std::string &text);
-  void modem_reboot();
 
  protected:
   output::BinaryOutput *gpio_ad_{nullptr};
   output::BinaryOutput *gpio_he_{nullptr};
   output::BinaryOutput *gpio_hg_{nullptr};
-  output::BinaryOutput *gpio_powerkey_{nullptr};
 };
 
 }  // namespace bk7670_sms

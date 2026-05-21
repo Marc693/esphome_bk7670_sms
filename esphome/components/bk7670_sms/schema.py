@@ -1,30 +1,17 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import uart, output
-from esphome.const import CONF_ID
 
-# Namespace du composant
 bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
-
-# Déclaration de la classe C++ (doit correspondre EXACTEMENT au .h)
 BK7670SMS = bk7670_ns.class_("BK7670SMS", uart.UARTDevice)
 
-# Champs YAML
 CONF_GPIO_AD = "gpio_ad"
 CONF_GPIO_HE = "gpio_he"
 CONF_GPIO_HG = "gpio_hg"
-CONF_GPIO_POWERKEY = "gpio_powerkey"
 
-# Schéma de configuration
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BK7670SMS),
-
-    cv.Required("uart_id"): cv.use_id(uart.UARTComponent),
-    cv.Required("pin_code"): cv.string,
-    cv.Required("acl_numbers"): cv.ensure_list(cv.string),
-
     cv.Required(CONF_GPIO_AD): cv.use_id(output.BinaryOutput),
     cv.Required(CONF_GPIO_HE): cv.use_id(output.BinaryOutput),
     cv.Required(CONF_GPIO_HG): cv.use_id(output.BinaryOutput),
-    cv.Required(CONF_GPIO_POWERKEY): cv.use_id(output.BinaryOutput),
-})
+}).extend(uart.UART_DEVICE_SCHEMA)
