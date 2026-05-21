@@ -8,9 +8,9 @@ static const char *const TAG = "bk7670_sms";
 
 void BK7670SMS::loop() {
   while (this->available()) {
-    char c;
+    uint8_t c;
     this->read_byte(&c);
-    // traiter si besoin
+    // traitement si besoin
   }
 }
 

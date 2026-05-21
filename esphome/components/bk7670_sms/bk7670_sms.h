@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/output/binary_output.h"
 #include "esphome/core/component.h"
 
 namespace esphome {
