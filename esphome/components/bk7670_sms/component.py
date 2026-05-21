@@ -7,6 +7,8 @@ from .schema import (
     CONF_GPIO_AD,
     CONF_GPIO_HE,
     CONF_GPIO_HG,
+    CONF_PIN_CODE,
+    CONF_ACL_NUMBERS,
 )
 
 async def to_code(config):
@@ -22,3 +24,8 @@ async def to_code(config):
     cg.add(var.set_gpio_ad(ad))
     cg.add(var.set_gpio_he(he))
     cg.add(var.set_gpio_hg(hg))
+
+    cg.add(var.set_pin_code(config[CONF_PIN_CODE]))
+
+    for number in config[CONF_ACL_NUMBERS]:
+        cg.add(var.add_acl_number(number))
