@@ -3,7 +3,6 @@ import esphome.config_validation as cv
 from esphome.components import uart, switch
 from esphome.const import CONF_ID
 
-# Déclaration de la classe C++ ici (sans importer component.py)
 bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
 BK7670SMSComponent = bk7670_ns.class_("BK7670SMSComponent", cg.Component, uart.UARTDevice)
 
