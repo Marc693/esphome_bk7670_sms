@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import uart
+from esphome.components import uart, output
 from esphome.const import CONF_ID
 
 bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
@@ -18,9 +18,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required("pin_code"): cv.string,
     cv.Required("acl_numbers"): cv.ensure_list(cv.string),
 
-    # IMPORTANT : on utilise cg.OutputPin
-    cv.Required(CONF_GPIO_AD): cv.use_id(cg.OutputPin),
-    cv.Required(CONF_GPIO_HE): cv.use_id(cg.OutputPin),
-    cv.Required(CONF_GPIO_HG): cv.use_id(cg.OutputPin),
-    cv.Required(CONF_GPIO_POWERKEY): cv.use_id(cg.OutputPin),
+    # La bonne classe pour un output GPIO
+    cv.Required(CONF_GPIO_AD): cv.use_id(output.BinaryOutput),
+    cv.Required(CONF_GPIO_HE): cv.use_id(output.BinaryOutput),
+    cv.Required(CONF_GPIO_HG): cv.use_id(output.BinaryOutput),
+    cv.Required(CONF_GPIO_POWERKEY): cv.use_id(output.BinaryOutput),
 })
