@@ -9,14 +9,14 @@ from .schema import (
     CONF_GPIO_POWERKEY,
 )
 
-BK7670SMSComponent = cg.global_ns.class_("BK7670SMSComponent", cg.Component, uart.UARTDevice)
+bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
+BK7670SMSComponent = bk7670_ns.class_("BK7670SMSComponent", cg.Component, uart.UARTDevice)
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
 
-    # Méthode B : assignation des IDs de switch
     ad = await cg.get_variable(config[CONF_GPIO_AD])
     he = await cg.get_variable(config[CONF_GPIO_HE])
     hg = await cg.get_variable(config[CONF_GPIO_HG])
