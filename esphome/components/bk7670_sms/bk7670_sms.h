@@ -6,6 +6,7 @@
 #include "esphome/core/log.h"
 #include <vector>
 #include <string>
+#include <queue>
 
 namespace esphome {
 namespace bk7670_sms {
@@ -43,14 +44,21 @@ class BK7670SMS : public uart::UARTDevice, public Component {
   // --- Ajouts pour lecture non bloquante et état SMS ---
   std::string uart_buffer_;               // buffer persistant pour la lecture UART
   bool awaiting_cmgr_body_{false};        // si la ligne suivante est le corps après +CMGR
-  // SMS send state machine
+
   enum SmsState { SMS_IDLE, SMS_WAIT_PROMPT, SMS_SENDING } sms_state_{SMS_IDLE};
   unsigned long sms_ts_{0};               // timestamp pour timeout
   std::string sms_pending_number_;
   std::string sms_pending_text_;
+
+  struct SmsItem { std::string number; std::string text; };
+  std::queue<SmsItem> sms_queue_;
+  unsigned long last_retry_ts_{0};
+  unsigned long backoff_ms_{2000};
+
   // helpers
   void handle_line(const std::string &line);
   void start_send_sms_sequence();
+  void queue_sms(const std::string &number, const std::string &text);
 };
 
 }  // namespace bk7670_sms
