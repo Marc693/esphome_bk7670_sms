@@ -11,7 +11,6 @@
 namespace esphome {
 namespace bk7670_sms {
 
-static const char *const TAG = "bk7670_sms";
 
 class BK7670SMS : public uart::UARTDevice, public Component {
  public:
@@ -63,6 +62,9 @@ class BK7670SMS : public uart::UARTDevice, public Component {
   std::string rx_buffer_;
   uint32_t last_uart_activity_{0};
 
+  // Header temporaire pour stocker l'entête CMGR en attente du corps
+  std::string incoming_header_;
+  
   // File d’attente AT
   std::queue<std::string> at_queue_;
   bool at_busy_{false};
