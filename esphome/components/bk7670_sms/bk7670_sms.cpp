@@ -6,13 +6,8 @@ namespace bk7670_sms {
 
 static const char *const TAG = "bk7670_sms";
 
-//
-// ──────────────────────────────────────────────────────────────
-//   LOOP PRINCIPALE
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::loop() {
-  // Lecture UART ligne par ligne
+  // Lecture ligne par ligne sur l'UART
   while (this->available()) {
     char c;
     this->read_byte(reinterpret_cast<uint8_t *>(&c));
@@ -31,7 +26,7 @@ void BK7670SMS::loop() {
     }
   }
 
-  // Gestion file AT
+  // Gestion file AT : envoi si libre
   if (!at_busy_ && !at_queue_.empty()) {
     std::string cmd = at_queue_.front();
     at_queue_.pop();
@@ -39,11 +34,13 @@ void BK7670SMS::loop() {
     at_last_send_ = millis();
 
     ESP_LOGI(TAG, "AT >> %s", cmd.c_str());
+    // stocker la dernière commande sans CRLF pour ignorer l'écho
+    this->last_at_sent_ = cmd;
     this->write_str((cmd + "\r\n").c_str());
   }
 
-  // Timeout AT
-  if (at_busy_ && millis() - at_last_send_ > 1500) {
+  // Timeout AT (plus permissif)
+  if (at_busy_ && millis() - at_last_send_ > 5000) {
     ESP_LOGW(TAG, "AT timeout, libération");
     at_busy_ = false;
   }
@@ -52,37 +49,52 @@ void BK7670SMS::loop() {
   if (millis() - last_modem_ok_ > 30000) {
     ESP_LOGW(TAG, "Modem silencieux, reboot via PWRKEY");
     reboot_count_++;
-    // Ici tu ajouteras ton GPIO PWRKEY si nécessaire
     last_modem_ok_ = millis();
   }
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   FILE D’ATTENTE AT
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::queue_at(const std::string &cmd) {
-  at_queue_.push(cmd);
+  // stocke la commande (sans CRLF) pour ignorer son écho
+  this->at_queue_.push(cmd);
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   TRAITEMENT DES LIGNES UART
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::process_line_(const std::string &line) {
   last_uart_activity_ = millis();
 
+  // 1) Ignorer l'écho exact de la dernière commande envoyée
+  if (!last_at_sent_.empty() && line == last_at_sent_) {
+    ESP_LOGD(TAG, "Echo modem ignoré: %s", line.c_str());
+    return;
+  }
+
+  // 2) Si on attend le prompt '>' pour CMGS
+  if (this->expecting_cmgs_prompt_) {
+    std::string s = line;
+    // trim espaces
+    while (!s.empty() && isspace((unsigned char)s.front())) s.erase(0,1);
+    while (!s.empty() && isspace((unsigned char)s.back())) s.pop_back();
+    if (s == ">") {
+      ESP_LOGI(TAG, "Prompt '>' reçu, envoi du corps SMS");
+      // envoyer le corps directement (pas via queue_at) + CTRL+Z
+      this->write_str(this->pending_sms_body_.c_str());
+      this->write_byte(0x1A);
+      this->expecting_cmgs_prompt_ = false;
+      this->pending_sms_body_.clear();
+      return;
+    }
+  }
+
+  // 3) Réponses classiques
   if (line == "OK") {
     at_busy_ = false;
     last_modem_ok_ = millis();
+    ESP_LOGD(TAG, "AT OK reçu");
     return;
   }
 
   if (line == "ERROR") {
     at_busy_ = false;
-    ESP_LOGE(TAG, "Erreur AT");
+    ESP_LOGW(TAG, "AT ERROR reçu");
     return;
   }
 
@@ -94,8 +106,6 @@ void BK7670SMS::process_line_(const std::string &line) {
 
   // Réponse CMGR (header)
   if (line.rfind("+CMGR:", 0) == 0) {
-    // Le corps du SMS arrivera dans la ligne suivante
-    // On stocke le header temporairement
     incoming_header_ = line;
     return;
   }
@@ -106,15 +116,18 @@ void BK7670SMS::process_line_(const std::string &line) {
     incoming_header_.clear();
     return;
   }
+
+  // +CMGS (confirmation d'envoi)
+  if (line.rfind("+CMGS:", 0) == 0) {
+    ESP_LOGI(TAG, "CMGS: %s", line.c_str());
+    // laisser OK suivant gérer la libération
+    return;
+  }
+
+  ESP_LOGD(TAG, "RX non traité: %s", line.c_str());
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   TRAITEMENT CMTI (nouveau SMS)
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::handle_cmti_(const std::string &line) {
-  // Exemple : +CMTI: "SM",3
   auto pos = line.find(',');
   if (pos == std::string::npos)
     return;
@@ -125,25 +138,12 @@ void BK7670SMS::handle_cmti_(const std::string &line) {
   read_sms_index_(index);
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   LECTURE DU SMS VIA CMGR
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::read_sms_index_(int index) {
   queue_at("AT+CMGF=1");
   queue_at("AT+CMGR=" + std::to_string(index));
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   PARSING DU SMS (CMGR)
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::parse_cmgr_(const std::string &header, const std::string &body) {
-  // Exemple header :
-  // +CMGR: "REC UNREAD","+33650855673","","24/05/21,14:22:10+08"
-
   std::string sender;
   auto first = header.find('"');
   if (first != std::string::npos) {
@@ -163,11 +163,6 @@ void BK7670SMS::parse_cmgr_(const std::string &header, const std::string &body) 
   process_sms(sender, body);
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   SÉCURITÉ : ACL
-// ──────────────────────────────────────────────────────────────
-//
 bool BK7670SMS::is_acl_allowed_(const std::string &num) {
   for (auto &n : acl_numbers_) {
     if (n == num)
@@ -176,11 +171,6 @@ bool BK7670SMS::is_acl_allowed_(const std::string &num) {
   return false;
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   SÉCURITÉ : PIN
-// ──────────────────────────────────────────────────────────────
-//
 bool BK7670SMS::check_pin_(const std::string &body) {
   if (pin_code_.empty())
     return true;
@@ -188,11 +178,6 @@ bool BK7670SMS::check_pin_(const std::string &body) {
   return body.rfind(pin_code_, 0) == 0;
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   TRAITEMENT LOGIQUE DES SMS
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::process_sms(const std::string &sender, const std::string &body) {
   if (!is_acl_allowed_(sender)) {
     ESP_LOGW(TAG, "Numéro non autorisé : %s", sender.c_str());
@@ -226,24 +211,17 @@ void BK7670SMS::process_sms(const std::string &sender, const std::string &body) 
   }
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   ENVOI SMS SORTANT
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
-  ESP_LOGI(TAG, "Envoi SMS à %s : %s", number.c_str(), text.c_str());
-
+  ESP_LOGI(TAG, "Queue SMS à %s", number.c_str());
+  // Mode texte
   queue_at("AT+CMGF=1");
+  // Demander l'envoi ; on attendra le prompt '>' pour envoyer le corps
   queue_at("AT+CMGS=\"" + number + "\"");
-  queue_at(text + "\x1A");
+  // stocker le corps et activer le flag d'attente
+  this->pending_sms_body_ = text;
+  this->expecting_cmgs_prompt_ = true;
 }
 
-//
-// ──────────────────────────────────────────────────────────────
-//   COMMANDES GPIO
-// ──────────────────────────────────────────────────────────────
-//
 void BK7670SMS::do_arm() {
   ESP_LOGI(TAG, "ARM");
   if (gpio_hg_)

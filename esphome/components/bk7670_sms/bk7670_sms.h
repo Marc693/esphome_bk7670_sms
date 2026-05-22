@@ -7,10 +7,10 @@
 #include "esphome/core/log.h"
 #include <vector>
 #include <queue>
+#include <string>
 
 namespace esphome {
 namespace bk7670_sms {
-
 
 class BK7670SMS : public uart::UARTDevice, public Component {
  public:
@@ -64,15 +64,20 @@ class BK7670SMS : public uart::UARTDevice, public Component {
 
   // Header temporaire pour stocker l'entête CMGR en attente du corps
   std::string incoming_header_;
-  
+
   // File d’attente AT
   std::queue<std::string> at_queue_;
   bool at_busy_{false};
   uint32_t at_last_send_{0};
+  std::string last_at_sent_;  // pour ignorer l'écho exact
 
   // Watchdog modem
   uint32_t last_modem_ok_{0};
   int reboot_count_{0};
+
+  // CMGS state
+  bool expecting_cmgs_prompt_{false};
+  std::string pending_sms_body_;
 
   // Sensors HA
   text_sensor::TextSensor *incoming_sms_sensor_{nullptr};
