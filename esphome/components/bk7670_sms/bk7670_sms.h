@@ -5,13 +5,13 @@
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include <vector>
+#include <string>
 
 namespace esphome {
 namespace bk7670_sms {
 
 class BK7670SMS : public uart::UARTDevice, public Component {
  public:
-  // Constructeur conforme à UARTDevice
   BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
 
   void set_gpio_ad(output::BinaryOutput *out) { this->gpio_ad_ = out; }
@@ -39,6 +39,18 @@ class BK7670SMS : public uart::UARTDevice, public Component {
 
   std::string pin_code_{""};
   std::vector<std::string> acl_numbers_;
+
+  // --- Ajouts pour lecture non bloquante et état SMS ---
+  std::string uart_buffer_;               // buffer persistant pour la lecture UART
+  bool awaiting_cmgr_body_{false};        // si la ligne suivante est le corps après +CMGR
+  // SMS send state machine
+  enum SmsState { SMS_IDLE, SMS_WAIT_PROMPT, SMS_SENDING } sms_state_{SMS_IDLE};
+  unsigned long sms_ts_{0};               // timestamp pour timeout
+  std::string sms_pending_number_;
+  std::string sms_pending_text_;
+  // helpers
+  void handle_line(const std::string &line);
+  void start_send_sms_sequence();
 };
 
 }  // namespace bk7670_sms
