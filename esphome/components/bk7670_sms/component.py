@@ -1,25 +1,31 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
-from esphome.components import uart, output
+from esphome.components import uart
+from esphome.const import CONF_ID
 
-bk7670_ns = cg.esphome_ns.namespace("bk7670_sms")
-BK7670SMS = bk7670_ns.class_("BK7670SMS", uart.UARTDevice)
+from .schema import (
+    BK7670SMS,
+    CONF_GPIO_AD,
+    CONF_GPIO_HE,
+    CONF_GPIO_HG,
+    CONF_PIN_CODE,
+    CONF_ACL_NUMBERS,
+)
 
-CONF_GPIO_AD = "gpio_ad"
-CONF_GPIO_HE = "gpio_he"
-CONF_GPIO_HG = "gpio_hg"
+async def to_code(config):
+    uart_parent = await cg.get_variable(config["uart_id"])
+    var = cg.new_Pvariable(config[CONF_ID], uart_parent)
 
-CONF_PIN_CODE = "pin_code"
-CONF_ACL_NUMBERS = "acl_numbers"
+    await uart.register_uart_device(var, config)
 
-CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(BK7670SMS),
+    ad = await cg.get_variable(config[CONF_GPIO_AD])
+    he = await cg.get_variable(config[CONF_GPIO_HE])
+    hg = await cg.get_variable(config[CONF_GPIO_HG])
 
-    cv.Required(CONF_GPIO_AD): cv.use_id(output.BinaryOutput),
-    cv.Required(CONF_GPIO_HE): cv.use_id(output.BinaryOutput),
-    cv.Required(CONF_GPIO_HG): cv.use_id(output.BinaryOutput),
+    cg.add(var.set_gpio_ad(ad))
+    cg.add(var.set_gpio_he(he))
+    cg.add(var.set_gpio_hg(hg))
 
-    cv.Optional(CONF_PIN_CODE, default=""): cv.string,
-    cv.Optional(CONF_ACL_NUMBERS, default=[]): cv.ensure_list(cv.string),
+    cg.add(var.set_pin_code(config[CONF_PIN_CODE]))
 
-}).extend(uart.UART_DEVICE_SCHEMA)
+    for number in config[CONF_ACL_NUMBERS]:
+        cg.add(var.add_acl_number(number))
