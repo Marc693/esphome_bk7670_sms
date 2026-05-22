@@ -1,11 +1,5 @@
-from .schema import (
-    CONFIG_SCHEMA,
-    BK7670SMS,
-    CONF_INCOMING_SMS,
-    CONF_LAST_SENDER,
-    CONF_LAST_CMD,
-)
+from .schema import CONFIG_SCHEMA, BK7670SMS
 from .component import to_code
 
-AUTO_LOAD = ["uart", "output", "text_sensor"]
+AUTO_LOAD = ["uart", "output"]
 CODEOWNERS = ["@Marc693"]

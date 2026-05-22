@@ -1,97 +1,138 @@
-#pragma once
-
-#include "esphome/components/uart/uart.h"
-#include "esphome/components/output/binary_output.h"
-#include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/core/component.h"
+#include "bk7670_sms.h"
 #include "esphome/core/log.h"
-#include <vector>
-#include <queue>
-#include <string>
 
 namespace esphome {
 namespace bk7670_sms {
 
-class BK7670SMS : public uart::UARTDevice, public Component {
- public:
-  // Constructeur conforme à UARTDevice
-  BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
+static const char *const TAG = "bk7670_sms";
 
-  // GPIO pilotés par commandes SMS
-  void set_gpio_ad(output::BinaryOutput *out) { this->gpio_ad_ = out; }
-  void set_gpio_he(output::BinaryOutput *out) { this->gpio_he_ = out; }
-  void set_gpio_hg(output::BinaryOutput *out) { this->gpio_hg_ = out; }
+void BK7670SMS::loop() {
+  // Lecture ligne par ligne sur l'UART
+  while (this->available()) {
+    std::string line;
+    char c;
+    // Lire jusqu'à fin de ligne
+    while (this->available()) {
+      this->read_byte(reinterpret_cast<uint8_t *>(&c));
+      if (c == '\n')
+        break;
+      if (c != '\r')
+        line.push_back(c);
+    }
 
-  // Sécurité
-  void set_pin_code(const std::string &pin) { this->pin_code_ = pin; }
-  void add_acl_number(const std::string &num) { this->acl_numbers_.push_back(num); }
+    if (line.empty())
+      continue;
 
-  // Sensors HA
-  void set_incoming_sms_sensor(text_sensor::TextSensor *s) { this->incoming_sms_sensor_ = s; }
-  void set_last_sender_sensor(text_sensor::TextSensor *s) { this->last_sender_sensor_ = s; }
-  void set_last_cmd_sensor(text_sensor::TextSensor *s) { this->last_cmd_sensor_ = s; }
+    ESP_LOGV(TAG, "RX: %s", line.c_str());
 
-  // Boucle principale
-  void loop() override;
+    // Détection d'un SMS entrant en mode texte
+    // Exemple: +CMT: "+33650855673","","24/05/21,14:22:10+08"
+    if (line.rfind("+CMT:", 0) == 0) {
+      // Extraction du numéro entre guillemets
+      std::string sender;
+      auto first_quote = line.find('"');
+      if (first_quote != std::string::npos) {
+        auto second_quote = line.find('"', first_quote + 1);
+        if (second_quote != std::string::npos && second_quote > first_quote + 1) {
+          sender = line.substr(first_quote + 1, second_quote - first_quote - 1);
+        }
+      }
 
-  // Envoi AT sécurisé (file d’attente)
-  void queue_at(const std::string &cmd);
+      // Ligne suivante = corps du SMS
+      std::string body;
+      while (this->available()) {
+        body.clear();
+        while (this->available()) {
+          this->read_byte(reinterpret_cast<uint8_t *>(&c));
+          if (c == '\n')
+            break;
+          if (c != '\r')
+            body.push_back(c);
+        }
+        if (!body.empty())
+          break;
+      }
 
-  // Envoi SMS sortant
-  void send_sms(const std::string &number, const std::string &text);
+      ESP_LOGI(TAG, "SMS reçu de %s : %s", sender.c_str(), body.c_str());
+      if (!sender.empty() && !body.empty()) {
+        this->process_sms(sender, body);
+      }
+    }
+  }
+}
 
-  // Traitement SMS entrants
-  void process_sms(const std::string &sender, const std::string &body);
+void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
+  ESP_LOGI(TAG, "Envoi SMS à %s : %s", number.c_str(), text.c_str());
 
-  // Commandes logiques
-  void do_arm();
-  void do_disarm();
-  void do_status(const std::string &sender);
+  this->write_str("AT+CMGF=1\r\n");
+  delay(200);
 
- protected:
-  // GPIO
-  output::BinaryOutput *gpio_ad_{nullptr};
-  output::BinaryOutput *gpio_he_{nullptr};
-  output::BinaryOutput *gpio_hg_{nullptr};
+  this->write_str("AT+CMGS=\"");
+  this->write_str(number.c_str());
+  this->write_str("\"\r\n");
+  delay(200);
 
-  // Sécurité
-  std::string pin_code_{""};
-  std::vector<std::string> acl_numbers_;
+  this->write_str(text.c_str());
+  this->write_byte(26);  // CTRL+Z
+}
 
-  // Buffers UART
-  std::string rx_buffer_;
-  uint32_t last_uart_activity_{0};
+void BK7670SMS::process_sms(const std::string &sender, const std::string &body) {
+  // Vérification ACL
+  bool allowed = false;
+  for (auto &num : this->acl_numbers_) {
+    if (num == sender) {
+      allowed = true;
+      break;
+    }
+  }
+  if (!allowed) {
+    ESP_LOGW(TAG, "SMS rejeté : numéro non autorisé (%s)", sender.c_str());
+    return;
+  }
 
-  // Header temporaire pour stocker l'entête CMGR en attente du corps
-  std::string incoming_header_;
+  // Vérification PIN
+  if (this->pin_code_.empty() || body.rfind(this->pin_code_, 0) != 0) {
+    ESP_LOGW(TAG, "SMS rejeté : PIN incorrect");
+    return;
+  }
 
-  // File d’attente AT
-  std::queue<std::string> at_queue_;
-  bool at_busy_{false};
-  uint32_t at_last_send_{0};
-  std::string last_at_sent_;  // pour ignorer l'écho exact
+  // Extraction commande après le PIN
+  std::string cmd = body.substr(this->pin_code_.size());
+  while (!cmd.empty() && cmd[0] == ' ')
+    cmd.erase(0, 1);
 
-  // Watchdog modem
-  uint32_t last_modem_ok_{0};
-  int reboot_count_{0};
+  ESP_LOGI(TAG, "Commande SMS reçue : '%s'", cmd.c_str());
 
-  // CMGS state
-  bool expecting_cmgs_prompt_{false};
-  std::string pending_sms_body_;
+  if (cmd == "ARM") {
+    this->do_arm();
+    this->send_sms(sender, "Alarme ARMEE");
+  } else if (cmd == "DISARM") {
+    this->do_disarm();
+    this->send_sms(sender, "Alarme DESARMEE");
+  } else if (cmd == "STATUS") {
+    this->do_status(sender);
+  } else {
+    this->send_sms(sender, "Commande inconnue");
+  }
+}
 
-  // Sensors HA
-  text_sensor::TextSensor *incoming_sms_sensor_{nullptr};
-  text_sensor::TextSensor *last_sender_sensor_{nullptr};
-  text_sensor::TextSensor *last_cmd_sensor_{nullptr};
+void BK7670SMS::do_arm() {
+  ESP_LOGI(TAG, "Commande ARM");
+  if (this->gpio_hg_ != nullptr)
+    this->gpio_hg_->turn_on();
+}
 
-  // Méthodes internes
-  void process_line_(const std::string &line);
-  void handle_cmti_(const std::string &line);
-  void read_sms_index_(int index);
-  void parse_cmgr_(const std::string &header, const std::string &body);
-  bool is_acl_allowed_(const std::string &num);
-  bool check_pin_(const std::string &body);
-};
+void BK7670SMS::do_disarm() {
+  ESP_LOGI(TAG, "Commande DISARM");
+  if (this->gpio_hg_ != nullptr)
+    this->gpio_hg_->turn_off();
+}
+
+void BK7670SMS::do_status(const std::string &sender) {
+  ESP_LOGI(TAG, "Commande STATUS");
+  // Ici, on envoie un statut simple. Tu pourras enrichir avec des id() via lambdas YAML si besoin.
+  this->send_sms(sender, "STATUS: commande OK (etat detaille a implementer via YAML ou extension)");
+}
 
 }  // namespace bk7670_sms
 }  // namespace esphome
