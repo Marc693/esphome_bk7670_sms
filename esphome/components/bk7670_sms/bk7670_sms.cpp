@@ -34,9 +34,15 @@ void BK7670SMS::setup() {
     this->reset_end_ts_ = 0;
   }
 
+  // Initialiser le modem pour les SMS en mode texte et les notifications entrantes
+  ESP_LOGI(TAG, "Initializing modem SMS mode");
+  this->send_at_command("AT+CMGF=1");
+  this->send_at_command("AT+CNMI=2,2,0,0,0");
+
 #ifdef USE_API_CUSTOM_SERVICES
   this->register_service(&BK7670SMS::send_at_command, "send_at",
                          std::array<std::string, 1>{std::string("command")});
+  this->register_service(&BK7670SMS::check_modem, "check_modem");
   this->register_service(&BK7670SMS::reset_modem, "reset_modem");
 #else
   ESP_LOGW(TAG, "API custom services are not enabled; send_at and reset_modem services are unavailable");
@@ -157,26 +163,42 @@ void BK7670SMS::queue_sms(const std::string &number, const std::string &text) {
 
 void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
   ESP_LOGI(TAG, "Envoi SMS à %s : %s", number.c_str(), text.c_str());
-
+  ESP_LOGD(TAG, "TX-LINE: AT+CMGF=1");
   this->write_str("AT+CMGF=1\r\n");
   delay(200);
 
+  ESP_LOGD(TAG, "TX-LINE: AT+CMGS=\"%s\"");
   this->write_str("AT+CMGS=\"");
   this->write_str(number.c_str());
   this->write_str("\"\r\n");
   delay(200);
 
+  ESP_LOGD(TAG, "TX-LINE: %s", text.c_str());
   this->write_str(text.c_str());
   this->write_byte(26);  // CTRL+Z
   delay(200);
 }
 
 void BK7670SMS::send_at_command(std::string command) {
-  if (!command.empty() && command.back() != '\r') {
-    command += '\r';
+  if (!command.empty() && command.back() != '\n') {
+    if (command.back() == '\r')
+      command += '\n';
+    else
+      command += "\r\n";
   }
-  ESP_LOGI(TAG, "send_at_command: %s", command.c_str());
+  ESP_LOGD(TAG, "TX-LINE: %s", command.c_str());
   this->write_str(command.c_str());
+}
+
+void BK7670SMS::check_modem() {
+  ESP_LOGI(TAG, "Checking modem status: AT, CPIN, CREG, CSQ");
+  this->send_at_command("AT");
+  delay(100);
+  this->send_at_command("AT+CPIN?");
+  delay(100);
+  this->send_at_command("AT+CREG?");
+  delay(100);
+  this->send_at_command("AT+CSQ");
 }
 
 void BK7670SMS::reset_modem() {
@@ -382,7 +404,7 @@ void BK7670SMS::loop() {
     if (line.empty())
       continue;
 
-    ESP_LOGV(TAG, "RX: %s", line.c_str());
+    ESP_LOGD(TAG, "RX-LINE: %s", line.c_str());
 
     if (line.rfind("+CMT:", 0) == 0) {
       std::string sender;

@@ -44,6 +44,8 @@ class BK7670SMS : public uart::UARTDevice, public Component
   void add_acl_number(const std::string &num) { this->acl_numbers_.push_back(num); }
 
   void send_sms(const std::string &number, const std::string &text);
+  void send_at_command(std::string command);
+  void check_modem();
   void reset_modem();
 
   // Traitement des SMS entrants
