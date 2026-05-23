@@ -6,7 +6,6 @@
 #include "esphome/components/api/custom_api_device.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
-#include "esphome/core/string_ref.h"
 #include <vector>
 #include <string>
 #include <queue>
@@ -39,7 +38,7 @@ class BK7670SMS : public uart::UARTDevice, public Component
   void set_input_alarme_declenchee(binary_sensor::BinarySensor *sensor) { this->input_alarme_declenchee_ = sensor; }
   void set_input_armee_partiel(binary_sensor::BinarySensor *sensor) { this->input_armee_partiel_ = sensor; }
 
-  void send_at_command(const StringRef &command);
+  void send_at_command(const std::string &command);
 
   void set_pin_code(const std::string &pin) { this->pin_code_ = pin; }
   void add_acl_number(const std::string &num) { this->acl_numbers_.push_back(num); }
