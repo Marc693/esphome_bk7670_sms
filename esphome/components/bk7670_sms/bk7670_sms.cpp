@@ -166,7 +166,7 @@ void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
   start_send_sms_sequence();
 }
 
-void BK7670SMS::send_at_command(const api::StringRef &command) {
+void BK7670SMS::send_at_command(const StringRef &command) {
   std::string cmd(command.data(), command.size());
   if (!cmd.empty() && cmd.back() != '\r') {
     cmd += '\r';
