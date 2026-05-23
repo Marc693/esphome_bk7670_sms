@@ -166,13 +166,12 @@ void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
   start_send_sms_sequence();
 }
 
-void BK7670SMS::send_at_command(const std::string &command) {
-  std::string cmd = command;
-  if (!cmd.empty() && cmd.back() != '\r') {
-    cmd += '\r';
+void BK7670SMS::send_at_command(std::string command) {
+  if (!command.empty() && command.back() != '\r') {
+    command += '\r';
   }
-  ESP_LOGI(TAG, "send_at_command: %s", cmd.c_str());
-  this->write_str(cmd.c_str());
+  ESP_LOGI(TAG, "send_at_command: %s", command.c_str());
+  this->write_str(command.c_str());
 }
 
 void BK7670SMS::reset_modem() {
