@@ -371,6 +371,16 @@ void BK7670SMS::loop() {
     count++;
     uart_buffer_.push_back((char)c);
     ESP_LOGD(TAG, "RX 0x%02X", c);
+
+    if (this->sms_state_ == SMS_WAIT_PROMPT && c == '>') {
+      ESP_LOGI(TAG, "Detected SMS prompt '>' in raw stream");
+      this->write_array((const uint8_t*)sms_pending_text_.c_str(), sms_pending_text_.length());
+      uint8_t ctrlz = 0x1A;
+      this->write_array(&ctrlz, 1);
+      this->sms_state_ = SMS_SENDING;
+      this->sms_ts_ = millis();
+      ESP_LOGI(TAG, "Sent SMS payload after prompt, waiting for confirmation");
+    }
   }
 
   // Extraire lignes terminées par CRLF
