@@ -156,14 +156,19 @@ void BK7670SMS::queue_sms(const std::string &number, const std::string &text) {
 }
 
 void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
-  // API publique : ajoute en file si occupé
-  if (sms_state_ != SMS_IDLE || !sms_queue_.empty()) {
-    queue_sms(number, text);
-    return;
-  }
-  sms_pending_number_ = number;
-  sms_pending_text_ = text;
-  start_send_sms_sequence();
+  ESP_LOGI(TAG, "Envoi SMS à %s : %s", number.c_str(), text.c_str());
+
+  this->write_str("AT+CMGF=1\r\n");
+  delay(200);
+
+  this->write_str("AT+CMGS=\"");
+  this->write_str(number.c_str());
+  this->write_str("\"\r\n");
+  delay(200);
+
+  this->write_str(text.c_str());
+  this->write_byte(26);  // CTRL+Z
+  delay(200);
 }
 
 void BK7670SMS::send_at_command(std::string command) {
@@ -362,74 +367,55 @@ void BK7670SMS::on_armee_partiel_state(bool state) {
 }
 
 void BK7670SMS::loop() {
-  // Lecture non bloquante
-  uint8_t c;
-  int count = 0;
-  const int max_reads = 32;
-  while (this->available() && count < max_reads) {
-    if (!this->read_byte(&c)) break;
-    count++;
-    uart_buffer_.push_back((char)c);
-    ESP_LOGD(TAG, "RX 0x%02X", c);
-
-    if (this->sms_state_ == SMS_WAIT_PROMPT && c == '>') {
-      ESP_LOGI(TAG, "Detected SMS prompt '>' in raw stream");
-      this->write_array((const uint8_t*)sms_pending_text_.c_str(), sms_pending_text_.length());
-      uint8_t ctrlz = 0x1A;
-      this->write_array(&ctrlz, 1);
-      this->sms_state_ = SMS_SENDING;
-      this->sms_ts_ = millis();
-      ESP_LOGI(TAG, "Sent SMS payload after prompt, waiting for confirmation");
+  while (this->available()) {
+    std::string line;
+    char c;
+    while (this->available()) {
+      if (!this->read_byte(reinterpret_cast<uint8_t *>(&c)))
+        break;
+      if (c == '\n')
+        break;
+      if (c != '\r')
+        line.push_back(c);
     }
-  }
 
-  // Extraire lignes terminées par CRLF
-  size_t pos;
-  while ((pos = uart_buffer_.find("\r\n")) != std::string::npos) {
-    std::string line = uart_buffer_.substr(0, pos);
-    if (!line.empty() && line.back() == '\r') line.pop_back();
-    handle_line(line);
-    uart_buffer_.erase(0, pos + 2);
-  }
+    if (line.empty())
+      continue;
 
-  unsigned long now = millis();
-  this->update_desarm_timer(now);
-  this->update_reset_timer(now);
+    ESP_LOGV(TAG, "RX: %s", line.c_str());
 
-  // Gestion des timeouts SMS
-  if (sms_state_ == SMS_WAIT_PROMPT) {
-    if (now - sms_ts_ > 15000) {
-      ESP_LOGW(TAG, "SMS prompt timeout");
-      sms_state_ = SMS_IDLE;
-      last_retry_ts_ = now;
-      backoff_ms_ = std::min<unsigned long>(backoff_ms_ * 2, 60000);
+    if (line.rfind("+CMT:", 0) == 0) {
+      std::string sender;
+      auto first_quote = line.find('"');
+      if (first_quote != std::string::npos) {
+        auto second_quote = line.find('"', first_quote + 1);
+        if (second_quote != std::string::npos && second_quote > first_quote + 1) {
+          sender = line.substr(first_quote + 1, second_quote - first_quote - 1);
+        }
+      }
+
+      std::string body;
+      while (this->available()) {
+        body.clear();
+        while (this->available()) {
+          if (!this->read_byte(reinterpret_cast<uint8_t *>(&c)))
+            break;
+          if (c == '\n')
+            break;
+          if (c != '\r')
+            body.push_back(c);
+        }
+        if (!body.empty())
+          break;
+      }
+
+      ESP_LOGI(TAG, "SMS reçu de %s : %s", sender.c_str(), body.c_str());
+      if (!sender.empty() && !body.empty()) {
+        this->process_sms(sender, body);
+      }
+    } else {
+      this->handle_line(line);
     }
-  } else if (sms_state_ == SMS_SENDING) {
-    if (now - sms_ts_ > 60000) {
-      ESP_LOGW(TAG, "SMS send timeout");
-      sms_state_ = SMS_IDLE;
-      last_retry_ts_ = now;
-      backoff_ms_ = std::min<unsigned long>(backoff_ms_ * 2, 60000);
-    }
-  }
-
-  // Retry/backoff et traitement de la file
-  if (sms_state_ == SMS_IDLE && !sms_queue_.empty()) {
-    if (now - last_retry_ts_ >= backoff_ms_) {
-      auto next = sms_queue_.front();
-      sms_queue_.pop();
-      sms_pending_number_ = next.number;
-      sms_pending_text_ = next.text;
-      start_send_sms_sequence();
-      last_retry_ts_ = now;
-    }
-  }
-
-  // Sécurité buffer
-  const size_t max_buffer_len = 8192;
-  if (uart_buffer_.size() > max_buffer_len) {
-    ESP_LOGW(TAG, "UART buffer overflow, clearing");
-    uart_buffer_.clear();
   }
 }
 
