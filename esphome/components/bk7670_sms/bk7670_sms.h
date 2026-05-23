@@ -3,18 +3,23 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/output/binary_output.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/api/api_service.h"
+#include "esphome/components/api/custom_api_device.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include <vector>
 #include <string>
 #include <queue>
 #include <functional>
+#include <array>
 
 namespace esphome {
 namespace bk7670_sms {
 
-class BK7670SMS : public uart::UARTDevice, public Component {
+class BK7670SMS : public uart::UARTDevice, public Component
+#ifdef USE_API
+    , public api::CustomAPIDevice
+#endif
+{
  public:
   BK7670SMS(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
 
@@ -39,7 +44,6 @@ class BK7670SMS : public uart::UARTDevice, public Component {
   void add_acl_number(const std::string &num) { this->acl_numbers_.push_back(num); }
 
   void send_sms(const std::string &number, const std::string &text);
-  void send_at_command(const std::string &command);
   void reset_modem();
 
   // Traitement des SMS entrants
@@ -67,6 +71,9 @@ class BK7670SMS : public uart::UARTDevice, public Component {
   std::string pin_code_{""};
   std::vector<std::string> acl_numbers_;
 
+  bool gpio_reset_state_{false};
+  unsigned long reset_end_ts_{0};
+
   // --- Ajouts pour lecture non bloquante et état SMS ---
   std::string uart_buffer_;               // buffer persistant pour la lecture UART
   bool awaiting_cmgr_body_{false};        // si la ligne suivante est le corps après +CMGR
@@ -86,7 +93,6 @@ class BK7670SMS : public uart::UARTDevice, public Component {
   bool gpio_he_state_{false};
   bool gpio_hg_state_{false};
   unsigned long desarm_end_ts_{0};
-  api::ApiService *send_at_service_{nullptr};
 
   bool input_sirene_int_state_{true};
   bool input_sirene_ext_state_{true};

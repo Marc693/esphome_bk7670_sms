@@ -1,5 +1,4 @@
 #include "bk7670_sms.h"
-#include "esphome/components/api/api_service.h"
 #include "esphome/core/application.h"
 #include "esphome/core/log.h"
 #include <sstream>
@@ -35,24 +34,13 @@ void BK7670SMS::setup() {
     this->reset_end_ts_ = 0;
   }
 
-  auto *send_at_service = new api::ApiService();
-  send_at_service->set_service("bk7670_sms", "send_at");
-  send_at_service->add_string("command", 1);
-  send_at_service->set_callback([this](api::ApiService *service) {
-    std::string command;
-    if (service->get_string("command", command)) {
-      this->send_at_command(command);
-    }
-  });
-  App.register_service(send_at_service);
-  this->send_at_service_ = send_at_service;
-
-  auto *reset_service = new api::ApiService();
-  reset_service->set_service("bk7670_sms", "reset_modem");
-  reset_service->set_callback([this](api::ApiService *service) {
-    this->reset_modem();
-  });
-  App.register_service(reset_service);
+#ifdef USE_API_CUSTOM_SERVICES
+  this->register_service(&BK7670SMS::send_at_command, "send_at",
+                         std::array<std::string, 1>{std::string("command")});
+  this->register_service(&BK7670SMS::reset_modem, "reset_modem");
+#else
+  ESP_LOGW(TAG, "API custom services are not enabled; send_at and reset_modem services are unavailable");
+#endif
 }
 
 void BK7670SMS::handle_line(const std::string &line) {
