@@ -73,6 +73,7 @@ class BK7670SMS : public uart::UARTDevice, public Component
 
   bool gpio_reset_state_{false};
   unsigned long reset_end_ts_{0};
+  unsigned long modem_ready_ts_ = 0;
 
   // --- Ajouts pour lecture non bloquante et état SMS ---
   std::string uart_buffer_;               // buffer persistant pour la lecture UART
