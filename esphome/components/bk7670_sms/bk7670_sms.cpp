@@ -38,9 +38,6 @@ void BK7670SMS::setup() {
   ESP_LOGI(TAG, "Initializing modem SMS mode");
   this->send_at_command("AT+CMGF=1");
   this->send_at_command("AT+CNMI=2,2,0,0,0");
-  // Le modem BK7670 nécessite 10–20 secondes après boot pour être pleinement opérationnel.
-  // On empêche l’envoi de SMS avant ce délai.
-  this->modem_ready_ts_ = millis() + 15000;  // 15 secondes
 
 #ifdef USE_API_CUSTOM_SERVICES
   this->register_service(&BK7670SMS::send_at_command, "send_at",
@@ -165,12 +162,7 @@ void BK7670SMS::queue_sms(const std::string &number, const std::string &text) {
 }
 
 void BK7670SMS::send_sms(const std::string &number, const std::string &text) {
-  // Correction minimale : empêcher l’envoi trop tôt après le boot
-  if (millis() < this->modem_ready_ts_) {
-    ESP_LOGW(TAG, "Modem not ready yet, SMS ignored temporarily");
-    return;
-  }
-    
+
   ESP_LOGI(TAG, "Envoi SMS à %s : %s", number.c_str(), text.c_str());
   ESP_LOGD(TAG, "TX-LINE: AT+CMGF=1");
   this->write_str("AT+CMGF=1\r\n");
